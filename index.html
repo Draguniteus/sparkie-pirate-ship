@@ -3,408 +3,288 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sparkie — Pirate Ship Voyage</title>
+  <title>Sparkie — Pirate Ship Deck</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { overflow: hidden; background: #000508; font-family: 'Georgia', serif; }
+    body { overflow: hidden; background: #050a12; font-family: 'Georgia', serif; }
     canvas { display: block; }
-    #hint { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); color: rgba(200,180,140,0.5); font-size: 12px; letter-spacing: 0.08em; pointer-events: none; transition: opacity 2s ease; }
-    #title { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); color: rgba(200,180,120,0.5); font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; }
+    #hint { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); color: rgba(180,150,100,0.4); font-size: 12px; letter-spacing: 0.08em; pointer-events: none; opacity: 1; transition: opacity 2s ease; }
+    #title { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); color: rgba(160,130,80,0.4); font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; }
   </style>
 </head>
 <body>
-<div id="title">⚓ PIRATE SHIP VOYAGE ⚓</div>
+<div id="title">🏴‍☠️ PIRATE SHIP DECK ⚓</div>
 <div id="hint">drag to orbit</div>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.1;
+renderer.toneMappingExposure = 1.0;
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0x000508, 0.018);
-scene.background = new THREE.Color(0x000508);
+scene.background = new THREE.Color(0x050a12);
+scene.fog = new THREE.FogExp2(0x050a12, 0.012);
 
-const camera = new THREE.PerspectiveCamera(65, innerWidth / innerHeight, 0.1, 500);
-camera.position.set(0, 8, 30);
+const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 300);
+camera.position.set(0, 6, 25);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.05;
 controls.autoRotate = true;
-controls.autoRotateSpeed = 0.1;
-controls.maxPolarAngle = Math.PI * 0.65;
-controls.minDistance = 8;
-controls.maxDistance = 65;
+controls.autoRotateSpeed = 0.08;
+controls.maxPolarAngle = Math.PI * 0.55;
+controls.minDistance = 5;
+controls.maxDistance = 50;
 
-const composer = new EffectComposer(renderer);
-composer.addPass(new THREE.RenderPass(scene, camera));
-composer.addPass(new THREE.UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 1.4, 0.5, 0.15));
+scene.add(new THREE.AmbientLight(0x1a2030, 0.4));
 
-scene.add(new THREE.AmbientLight(0x001020, 0.8));
-
-// Moonlight
-const moonLight = new THREE.DirectionalLight(0x8899cc, 0.6);
-moonLight.position.set(-10, 20, 10);
-scene.add(moonLight);
-
-// Lantern lights on ship
-[[-3,5,3],[3,5,3],[0,6,5]].forEach(([x,y,z], i) => {
-  const pl = new THREE.PointLight(0xff8833, 3.5, 15);
-  pl.position.set(x,y,z);
-  pl.userData.phase = i * 1.2;
-  scene.add(pl);
+// Deck planks
+const deckGeo = new THREE.PlaneGeometry(20, 30, 20, 30);
+const deckMat = new THREE.ShaderMaterial({
+  uniforms: {},
+  vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `
+    varying vec2 vUv;
+    float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5); }
+    void main() {
+      float plank = step(0.5, fract(vUv.y * 15.0));
+      float grain = hash(floor(vUv * vec2(20, 15))) * 0.15;
+      vec3 wood = vec3(0.25, 0.15, 0.08) + grain;
+      vec3 dark = vec3(0.15, 0.1, 0.05);
+      vec3 col = mix(wood, dark, plank * 0.5);
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `
 });
+const deck = new THREE.Mesh(deckGeo, deckMat);
+deck.rotation.x = -Math.PI / 2;
+deck.position.y = 0;
+scene.add(deck);
+
+// Hull
+const hullMat = new THREE.MeshStandardMaterial({ color: 0x3a2010, roughness: 0.9 });
+const hull = new THREE.Mesh(new THREE.BoxGeometry(22, 4, 32), hullMat);
+hull.position.set(0, -2, 0);
+scene.add(hull);
+
+// Hull ribs
+for (let r = 0; r < 8; r++) {
+  const rib = new THREE.Mesh(
+    new THREE.TorusGeometry(4 - r * 0.3, 0.3, 8, 16, Math.PI),
+    new THREE.MeshStandardMaterial({ color: 0x2a1508 })
+  );
+  rib.position.set(0, -2, -12 + r * 4);
+  rib.rotation.x = Math.PI / 2;
+  scene.add(rib);
+}
+
+// Mast
+const mastMat = new THREE.MeshStandardMaterial({ color: 0x4a3020, roughness: 0.9 });
+const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.4, 25, 12), mastMat);
+mast.position.set(0, 12.5, 2);
+scene.add(mast);
+
+// Crow's nest
+const nest = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.2, 1.5, 12), hullMat);
+nest.position.set(0, 22, 2);
+scene.add(nest);
+
+// Sail
+const sailMat = new THREE.ShaderMaterial({
+  uniforms: { uTime: { value: 0 } },
+  vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `
+    varying vec2 vUv;
+    uniform float uTime;
+    void main() {
+      float bulge = sin(vUv.y * 10.0 + uTime * 0.5) * 0.2 * vUv.y;
+      float edge = 1.0 - abs(vUv.x - 0.5 - bulge) * 2.0;
+      vec3 col = vec3(0.85, 0.8, 0.7);
+      gl_FragColor = vec4(col, edge * 0.9);
+    }
+  `,
+  transparent: true, side: THREE.DoubleSide
+});
+const sail = new THREE.Mesh(new THREE.PlaneGeometry(8, 12), sailMat);
+sail.position.set(0, 18, 2);
+sail.userData.isSail = true;
+scene.add(sail);
+
+// Yard arm
+const yard = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 10, 8), mastMat);
+yard.rotation.z = Math.PI / 2;
+yard.position.set(0, 22, 2);
+scene.add(yard);
+
+// Wheel
+const wheelMat = new THREE.MeshStandardMaterial({ color: 0x3a2515, metalness: 0.3, roughness: 0.8 });
+const wheel = new THREE.Mesh(new THREE.TorusGeometry(1.5, 0.15, 8, 20), wheelMat);
+wheel.position.set(0, 5, 10);
+wheel.rotation.x = Math.PI / 2;
+scene.add(wheel);
+
+// Wheel spokes
+for (let s = 0; s < 8; s++) {
+  const angle = (s / 8) * Math.PI * 2;
+  const spoke = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 1.5, 6), wheelMat);
+  spoke.rotation.z = angle;
+  spoke.position.set(0, 5, 10);
+  wheel.add(spoke);
+}
+
+// Compass
+const compass = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.3, 0.3, 0.1, 16),
+  new THREE.MeshStandardMaterial({ color: 0x888877 })
+);
+compass.position.set(0, 5.1, 10);
+scene.add(compass);
+
+// Cannons
+for (let c = 0; c < 4; c++) {
+  const cannon = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.2, 0.25, 2, 12),
+    new THREE.MeshStandardMaterial({ color: 0x2a2a2a, metalness: 0.7, roughness: 0.3 })
+  );
+  cannon.rotation.x = Math.PI / 2;
+  cannon.position.set(-5 + c * 3.5, 1.5, -5);
+  scene.add(cannon);
+  
+  const wheel2 = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.4, 0.4, 0.2, 12),
+    new THREE.MeshStandardMaterial({ color: 0x1a1a1a })
+  );
+  wheel2.rotation.z = Math.PI / 2;
+  wheel2.position.set(-5 + c * 3.5, 0.5, -5);
+  scene.add(wheel2);
+}
+
+// Anchor
+const anchorMat = new THREE.MeshStandardMaterial({ color: 0x3a3a3a, metalness: 0.8, roughness: 0.4 });
+const anchor = new THREE.Group();
+const anchorShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 3, 8), anchorMat);
+anchorShaft.rotation.z = Math.PI / 2;
+anchor.add(anchorShaft);
+const anchorRing = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.08, 8, 16), anchorMat);
+anchorRing.position.set(1.8, 0, 0);
+anchor.add(anchorRing);
+const anchorFluke = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 0.15), anchorMat);
+anchorFluke.position.set(-1.5, 0.4, 0);
+anchor.add(anchorFluke);
+anchor.position.set(8, 2, 10);
+scene.add(anchor);
+
+// Barrels
+for (let b = 0; b < 8; b++) {
+  const barrel = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.4, 0.4, 0.8, 12),
+    new THREE.MeshStandardMaterial({ color: 0x4a2a10, roughness: 0.85 })
+  );
+  barrel.position.set(-7 + (b % 4) * 1.5, 0.5, 8 + Math.floor(b / 4) * 2);
+  scene.add(barrel);
+}
+
+// Ropes
+for (let r = 0; r < 6; r++) {
+  const ropeMat = new THREE.MeshStandardMaterial({ color: 0x8a7a60, roughness: 0.95 });
+  const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 15 + Math.random() * 5, 6), ropeMat);
+  rope.position.set(-8 + r * 3.5, 8 + Math.random() * 5, 0);
+  rope.rotation.z = (Math.random() - 0.5) * 0.3;
+  scene.add(rope);
+}
+
+// Crates
+for (let c = 0; c < 6; c++) {
+  const crate = new THREE.Mesh(
+    new THREE.BoxGeometry(0.8 + Math.random() * 0.4, 0.8 + Math.random() * 0.4, 0.8 + Math.random() * 0.4),
+    new THREE.MeshStandardMaterial({ color: 0x5a4020, roughness: 0.9 })
+  );
+  crate.position.set(6 + (c % 3) * 1.2, 0.5 + Math.random() * 0.3, -8 + Math.floor(c / 3) * 2);
+  crate.rotation.y = Math.random() * 0.3;
+  scene.add(crate);
+}
+
+// Lanterns
+for (let l = 0; l < 4; l++) {
+  const lantern = new THREE.Mesh(
+    new THREE.SphereGeometry(0.3, 8, 8),
+    new THREE.MeshStandardMaterial({ color: 0xffcc66, emissive: 0xff8800, emissiveIntensity: 2.0 })
+  );
+  lantern.position.set(-8, 8, -8 + l * 5);
+  scene.add(lantern);
+  
+  const lLight = new THREE.PointLight(0xff8833, 2, 10);
+  lLight.position.set(-8, 8, -8 + l * 5);
+  scene.add(lLight);
+}
+
+// Ocean waves
+const waveCount = 100;
+const wavePos = new Float32Array(waveCount * 3);
+for (let i = 0; i < waveCount; i++) {
+  wavePos[i*3] = (Math.random() - 0.5) * 80;
+  wavePos[i*3+1] = -3;
+  wavePos[i*3+2] = (Math.random() - 0.5) * 80;
+}
+const waveGeo = new THREE.BufferGeometry();
+waveGeo.setAttribute('position', new THREE.BufferAttribute(wavePos, 3));
+const waveMat = new THREE.ShaderMaterial({
+  uniforms: { uTime: { value: 0 } },
+  vertexShader: `
+    uniform float uTime;
+    void main() {
+      vec3 p = position;
+      p.y += sin(p.x * 0.3 + uTime) * 1.5 + cos(p.z * 0.2 + uTime * 0.8) * 0.8;
+      gl_PointSize = 8.0;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+    }
+  `,
+  fragmentShader: `
+    void main() {
+      float d = length(gl_PointCoord - 0.5);
+      if (d > 0.5) discard;
+      float a = 1.0 - d * 2.0;
+      vec3 col = vec3(0.1, 0.3, 0.5);
+      gl_FragColor = vec4(col, a * 0.5);
+    }
+  `,
+  transparent: true, blending: THREE.AdditiveBlending, depthWrite: false
+});
+const waves = new THREE.Points(waveGeo, waveMat);
+waves.userData.isWaves = true;
+scene.add(waves);
 
 // Stars
-{
-  const pos = new Float32Array(3000 * 3);
-  for (let i = 0; i < 3000; i++) {
-    const theta = Math.random() * Math.PI * 2, phi = Math.acos(2 * Math.random() - 1), r = 120 + Math.random() * 80;
-    pos[i*3] = r * Math.sin(phi) * Math.cos(theta); pos[i*3+1] = r * Math.sin(phi) * Math.sin(theta); pos[i*3+2] = r * Math.cos(phi);
-  }
-  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  const starMat = new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 } },
-    vertexShader: `uniform float uTime; varying float vA; void main() { vA = 0.5 + 0.5 * sin(uTime * 2.5 + position.x * 0.05); gl_PointSize = 1.5 * vA; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-    fragmentShader: `varying float vA; void main() { float d = length(gl_PointCoord - 0.5); if (d > 0.5) discard; gl_FragColor = vec4(1.0, 0.95, 0.8, (1.0 - smoothstep(0.1, 0.5, d)) * vA); }`,
-    transparent: true, blending: THREE.AdditiveBlending, depthWrite: false
-  });
-  const stars = new THREE.Points(geo, starMat); stars.userData.isStars = true; scene.add(stars);
+const starCount = 1200;
+const starPos = new Float32Array(starCount * 3);
+for (let i = 0; i < starCount; i++) {
+  const theta = Math.random() * Math.PI * 2;
+  const r = 100 + Math.random() * 50;
+  starPos[i*3] = Math.cos(theta) * r;
+  starPos[i*3+1] = 20 + Math.random() * 60;
+  starPos[i*3+2] = Math.sin(theta) * r;
 }
-
-// Ocean
-{
-  const oceanGeo = new THREE.PlaneGeometry(200, 200, 80, 40);
-  const oceanMat = new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 } },
-    vertexShader: `
-      varying vec2 vUv;
-      varying vec3 vPos;
-      void main() {
-        vUv = uv;
-        vPos = position;
-        vec3 p = position;
-        float wave1 = sin(p.x * 0.3 + uTime * 0.8) * 0.5;
-        float wave2 = sin(p.y * 0.2 + uTime * 0.6) * 0.3;
-        float wave3 = sin((p.x + p.y) * 0.15 + uTime * 0.5) * 0.4;
-        p.z = wave1 + wave2 + wave3;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
-      }
-    `,
-    fragmentShader: `
-      uniform float uTime;
-      varying vec2 vUv;
-      varying vec3 vPos;
-      float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5); }
-      float noise(vec2 p) {
-        vec2 i = floor(p); vec2 f = fract(p);
-        vec2 u = f*f*(3.0-2.0*f);
-        return mix(mix(hash(i),hash(i+vec2(1,0)),u.x), mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),u.x),u.y);
-      }
-      void main() {
-        vec2 uv = vUv;
-        float n = noise(uv * 6.0 + uTime * 0.1);
-        vec3 deep = vec3(0.0, 0.02, 0.08);
-        vec3 mid = vec3(0.0, 0.04, 0.12);
-        vec3 foam = vec3(0.05, 0.08, 0.18);
-        vec3 col = mix(deep, mid, n);
-        float moonRefl = smoothstep(0.45, 0.55, 1.0 - length(vUv - vec2(0.3, 0.3))) * 0.3;
-        col += vec3(0.1, 0.12, 0.2) * moonRefl;
-        gl_FragColor = vec4(col, 1.0);
-      }
-    `
-  });
-  const ocean = new THREE.Mesh(oceanGeo, oceanMat);
-  ocean.rotation.x = -Math.PI / 2;
-  ocean.position.y = 0;
-  ocean.userData.isOcean = true;
-  scene.add(ocean);
-}
-
-// Pirate Ship
-function makePirateShip() {
-  const group = new THREE.Group();
-  const woodMat = new THREE.MeshStandardMaterial({ color: 0x3a2010, roughness: 0.95 });
-  const darkWoodMat = new THREE.MeshStandardMaterial({ color: 0x2a1508, roughness: 0.98 });
-  const sailMat = new THREE.MeshStandardMaterial({ color: 0xeeeecc, roughness: 0.9, side: THREE.DoubleSide });
-  const blackMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.9 });
-
-  // Hull
-  const hullShape = new THREE.Shape();
-  hullShape.moveTo(-5, 0); hullShape.lineTo(-4, -2); hullShape.lineTo(4, -2); hullShape.lineTo(5, 0); hullShape.lineTo(5, 1); hullShape.lineTo(-5, 1); hullShape.closePath();
-  const hullGeo = new THREE.ExtrudeGeometry(hullShape, { depth: 8, bevelEnabled: false });
-  const hull = new THREE.Mesh(hullGeo, woodMat);
-  hull.rotation.x = -Math.PI / 2;
-  hull.position.set(0, 0, -4);
-  group.add(hull);
-
-  // Deck
-  const deckGeo = new THREE.BoxGeometry(9, 1, 7);
-  const deck = new THREE.Mesh(deckGeo, woodMat);
-  deck.position.set(0, 0.5, 0);
-  group.add(deck);
-
-  // Bow (front point)
-  const bowGeo = new THREE.ConeGeometry(4, 4, 4);
-  bowGeo.rotateZ(-Math.PI / 2);
-  const bow = new THREE.Mesh(bowGeo, woodMat);
-  bow.position.set(6.5, 0, 0);
-  group.add(bow);
-
-  // Stern castle
-  const sternGeo = new THREE.BoxGeometry(3, 4, 6);
-  const stern = new THREE.Mesh(sternGeo, darkWoodMat);
-  stern.position.set(-4.5, 2.5, 0);
-  group.add(stern);
-
-  // Stern decorative stern
-  const sternBackGeo = new THREE.BoxGeometry(0.5, 5, 6);
-  const sternBack = new THREE.Mesh(sternBackGeo, darkWoodMat);
-  sternBack.position.set(-6, 3, 0);
-  group.add(sternBack);
-
-  // Deck railings
-  for (let side = -1; side <= 1; side += 2) {
-    for (let i = 0; i < 8; i++) {
-      const postGeo = new THREE.CylinderGeometry(0.05, 0.05, 1, 6);
-      const post = new THREE.Mesh(postGeo, darkWoodMat);
-      post.position.set(-3.5 + i * 1, 1.2, side * 3.3);
-      group.add(post);
-    }
-    // Railing beam
-    const beamGeo = new THREE.BoxGeometry(9, 0.08, 0.08);
-    const beam = new THREE.Mesh(beamGeo, darkWoodMat);
-    beam.position.set(0, 1.7, side * 3.3);
-    group.add(beam);
-  }
-
-  // Main mast
-  const mastMat = new THREE.MeshStandardMaterial({ color: 0x2a1508, roughness: 0.95 });
-  const mainMastGeo = new THREE.CylinderGeometry(0.15, 0.2, 14, 8);
-  const mainMast = new THREE.Mesh(mainMastGeo, mastMat);
-  mainMast.position.set(0, 7.5, 0);
-  group.add(mainMast);
-
-  // Crow's nest
-  const nestGeo = new THREE.CylinderGeometry(1.2, 1.0, 1, 8);
-  const nest = new THREE.Mesh(nestGeo, darkWoodMat);
-  nest.position.set(0, 12.5, 0);
-  group.add(nest);
-
-  // Foremast
-  const foreMastGeo = new THREE.CylinderGeometry(0.1, 0.15, 10, 8);
-  const foreMast = new THREE.Mesh(foreMastGeo, mastMat);
-  foreMast.position.set(4, 5.5, 0);
-  group.add(foreMast);
-
-  // Main sail
-  const mainSailGeo = new THREE.PlaneGeometry(5, 10, 8, 12);
-  const mainSail = new THREE.Mesh(mainSailGeo, sailMat);
-  mainSail.position.set(0, 7, 0.5);
-  group.add(mainSail);
-
-  // Sail curves
-  const sailPos = mainSail.geometry.attributes.position;
-  for (let i = 0; i < sailPos.count; i++) {
-    const y = (sailPos.getY(i) + 5) / 10;
-    const curve = Math.sin(y * Math.PI) * 0.4;
-    sailPos.setZ(i, curve);
-  }
-  mainSail.geometry.computeVertexNormals();
-
-  // Jib sail (front triangle)
-  const jibGeo = new THREE.PlaneGeometry(4, 7, 6, 8);
-  const jib = new THREE.Mesh(jibGeo, sailMat);
-  jib.position.set(3, 5.5, 0.3);
-  jib.rotation.y = 0.3;
-  group.add(jib);
-
-  // Crow's nest sail
-  const nestSailGeo = new THREE.PlaneGeometry(2, 3, 4, 6);
-  const nestSail = new THREE.Mesh(nestSailGeo, sailMat);
-  nestSail.position.set(0, 11, 0.4);
-  group.add(nestSail);
-
-  // Cross beam (horizontal spar)
-  const beam1Geo = new THREE.CylinderGeometry(0.08, 0.08, 6, 6);
-  const beam1 = new THREE.Mesh(beam1Geo, mastMat);
-  beam1.rotation.z = Math.PI / 2;
-  beam1.position.set(0, 7, 0);
-  group.add(beam1);
-
-  // Flag pole
-  const flagPoleGeo = new THREE.CylinderGeometry(0.03, 0.03, 3, 6);
-  const flagPole = new THREE.Mesh(flagPoleGeo, mastMat);
-  flagPole.position.set(0, 15, 0);
-  group.add(flagPole);
-
-  // Jolly Roger flag
-  const flagGeo = new THREE.PlaneGeometry(1.5, 1.0);
-  const flagCtx = document.createElement('canvas');
-  flagCtx.width = 128; flagCtx.height = 86;
-  const ctx = flagCtx.getContext('2d');
-  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 128, 86);
-  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(64, 35, 22, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(64, 35, 18, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#fff'; ctx.fillRect(55, 27, 18, 4); ctx.fillRect(55, 27, 4, 18);
-  ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(60, 43, 5, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#fff'; ctx.fillRect(63, 43, 4, 6);
-  const flagTex = new THREE.CanvasTexture(flagCtx);
-  const flagMat = new THREE.MeshStandardMaterial({ map: flagTex, side: THREE.DoubleSide, roughness: 0.9 });
-  const flag = new THREE.Mesh(flagGeo, flagMat);
-  flag.position.set(0.8, 14, 0);
-  flag.userData.isFlag = true;
-  group.add(flag);
-
-  // Cannons on sides
-  for (let i = 0; i < 3; i++) {
-    const cannonMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.6, metalness: 0.9 });
-    const cannonGeo = new THREE.CylinderGeometry(0.15, 0.18, 2, 8);
-    const cannon = new THREE.Mesh(cannonGeo, cannonMat);
-    cannon.rotation.z = Math.PI / 2;
-    [-2.5, 2.5].forEach(side => {
-      const c = cannon.clone();
-      c.position.set(-1 + i * 1.2, 0.7, side);
-      group.add(c);
-    });
-  }
-
-  // Anchor
-  const anchorMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.5, metalness: 0.9 });
-  const anchor = new THREE.Mesh(new THREE.TorusGeometry(0.4, 0.1, 6, 12), anchorMat);
-  anchor.position.set(5, -0.5, 2);
-  group.add(anchor);
-  const arm = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.5, 0.1), anchorMat);
-  arm.position.set(5, -0.5, 2);
-  group.add(arm);
-
-  // Wheel (helm)
-  const wheelMat = new THREE.MeshStandardMaterial({ color: 0x3a2010, roughness: 0.9 });
-  const wheelGeo = new THREE.TorusGeometry(0.8, 0.06, 8, 16);
-  const wheel = new THREE.Mesh(wheelGeo, wheelMat);
-  wheel.position.set(-4, 4.5, 2.5);
-  wheel.rotation.y = Math.PI / 2;
-  group.add(wheel);
-  for (let i = 0; i < 8; i++) {
-    const spokeGeo = new THREE.BoxGeometry(0.06, 0.8, 0.06);
-    const spoke = new THREE.Mesh(spokeGeo, wheelMat);
-    spoke.rotation.z = (i / 8) * Math.PI;
-    spoke.position.set(-4, 4.5, 2.5);
-    group.add(spoke);
-  }
-
-  // Barrels on deck
-  const barrelColors = [0x4a3010, 0x3a2510];
-  for (let i = 0; i < 4; i++) {
-    const bMat = new THREE.MeshStandardMaterial({ color: barrelColors[i % 2], roughness: 0.95 });
-    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.35, 0.8, 10), bMat);
-    barrel.position.set(-3 + i * 0.7, 1.1, 2.5);
-    group.add(barrel);
-  }
-
-  return group;
-}
-
-const ship = makePirateShip();
-ship.position.set(0, 1.5, 0);
-ship.userData.baseY = 1.5;
-scene.add(ship);
-
-// Moon
-{
-  const moonGeo = new THREE.SphereGeometry(4, 16, 16);
-  const moonMat = new THREE.MeshStandardMaterial({ color: 0xddcc99, emissive: 0xaaaabb, emissiveIntensity: 0.3, roughness: 0.9 });
-  const moon = new THREE.Mesh(moonGeo, moonMat);
-  moon.position.set(-40, 40, -60);
-  scene.add(moon);
-}
-
-// Water sparkles
-{
-  const spCount = 500;
-  const pos = new Float32Array(spCount * 3);
-  for (let i = 0; i < spCount; i++) {
-    pos[i*3] = (Math.random() - 0.5) * 100; pos[i*3+1] = 0.3; pos[i*3+2] = (Math.random() - 0.5) * 100;
-  }
-  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  const spMat = new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 } },
-    vertexShader: `uniform float uTime; varying float vA; void main() { vA = 0.3 + 0.7 * sin(uTime * 4.0 + position.x * 0.2 + position.z * 0.15); vec3 p = position; p.y += sin(uTime * 2.0 + position.x * 0.1) * 0.2; gl_PointSize = 4.0 * vA; gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0); }`,
-    fragmentShader: `varying float vA; void main() { float d = length(gl_PointCoord - 0.5); if (d > 0.5) discard; gl_FragColor = vec4(0.2, 0.3, 0.5, (1.0 - smoothstep(0.0, 0.5, d)) * vA); }`,
-    transparent: true, blending: THREE.AdditiveBlending, depthWrite: false
-  });
-  const sparkles = new THREE.Points(geo, spMat); sparkles.userData.isSparkles = true; scene.add(sparkles);
-}
-
-// Seagulls (distant birds)
-{
-  const birdCount = 30;
-  const pos = new Float32Array(birdCount * 3);
-  for (let i = 0; i < birdCount; i++) {
-    pos[i*3] = (Math.random() - 0.5) * 80; pos[i*3+1] = 15 + Math.random() * 20; pos[i*3+2] = (Math.random() - 0.5) * 80;
-  }
-  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  const birdMat = new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 } },
-    vertexShader: `uniform float uTime; void main() { vec3 p = position; p.x += sin(uTime * 0.3 + position.z) * 3.0; gl_PointSize = 2.0; gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0); }`,
-    fragmentShader: `void main() { gl_FragColor = vec4(0.8, 0.8, 0.8, 0.8); }`,
-    transparent: true
-  });
-  const birds = new THREE.Points(geo, birdMat); birds.userData.isBirds = true; scene.add(birds);
-}
-
-// Wake trail behind ship
-{
-  const wakeGeo = new THREE.PlaneGeometry(3, 15, 4, 12);
-  const wakeMat = new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 } },
-    vertexShader: `varying vec2 vUv; void main() { vUv = uv; vec3 p = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0); }`,
-    fragmentShader: `uniform float uTime; varying vec2 vUv; void main() { float stripe = sin(vUv.y * 15.0 - uTime * 3.0) * 0.5 + 0.5; float alpha = stripe * 0.3 * (1.0 - vUv.x); gl_FragColor = vec4(0.3, 0.4, 0.6, alpha); }`,
-    transparent: true, depthWrite: false, side: THREE.DoubleSide
-  });
-  const wake = new THREE.Mesh(wakeGeo, wakeMat);
-  wake.rotation.x = -Math.PI / 2;
-  wake.position.set(-10, 0.15, 0);
-  wake.userData.isWake = true;
-  scene.add(wake);
-}
+const starGeo = new THREE.BufferGeometry();
+starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.4, sizeAttenuation: true })));
 
 const clock = new THREE.Clock();
-
 function animate() {
   requestAnimationFrame(animate);
   const t = clock.getElapsedTime();
-
-  // Ship bob on waves
-  ship.position.y = ship.userData.baseY + Math.sin(t * 0.6) * 0.4;
-  ship.rotation.z = Math.sin(t * 0.4) * 0.03;
-  ship.rotation.x = Math.sin(t * 0.3) * 0.02;
-
-  scene.traverse(obj => {
-    if (obj.userData.isOcean && obj.material?.uniforms?.uTime) obj.material.uniforms.uTime.value = t;
-    if (obj.userData.isStars && obj.material?.uniforms?.uTime) obj.material.uniforms.uTime.value = t;
-    if (obj.userData.isSparkles && obj.material?.uniforms?.uTime) obj.material.uniforms.uTime.value = t;
-    if (obj.userData.isBirds && obj.material?.uniforms?.uTime) obj.material.uniforms.uTime.value = t;
-    if (obj.userData.isWake && obj.material?.uniforms?.uTime) obj.material.uniforms.uTime.value = t;
-    if (obj.userData.isFlag) obj.rotation.z = Math.sin(t * 2.0) * 0.1;
-  });
-
-  scene.children.forEach(c => {
-    if (c.isPointLight && c.userData.phase !== undefined) c.intensity = 3.5 + Math.sin(t * 1.5 + c.userData.phase) * 1.0;
-  });
-
+  
+  if (sail.userData.isSail && sail.material.uniforms.uTime) sail.material.uniforms.uTime.value = t;
+  if (waves.userData.isWaves) waves.material.uniforms.uTime.value = t;
+  
   controls.update();
-  composer.render();
+  renderer.render(scene, camera);
 }
 animate();
 
@@ -412,7 +292,6 @@ window.addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
-  composer.setSize(innerWidth, innerHeight);
 });
 setTimeout(() => { document.getElementById('hint').style.opacity = '0'; }, 5000);
 </script>
